@@ -1,4 +1,4 @@
-# Contentstack UI Extensions Template
+# Sidebar Widget Extension: Get Entry's References
 
 TODO: DOCUMENT WHAT THE EXTENSION DOES
 
