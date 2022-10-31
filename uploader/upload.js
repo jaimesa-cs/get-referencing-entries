@@ -15,27 +15,29 @@ function delay(time) {
 
 function LOG(options, message) {
   if (options.verbose) {
-    console.log(`[${options.name}] :: ${message}`);
+    console.log(`[${options.name || "-->"}] :: ${message}`);
   }
 }
 
 async function run(options) {
   //1. Update index.html with the newly generated references
   const extensionsFolderUid = await replaceReferences(options);
-  //2. Upload index.html with new paths
-  const { url: indexUrl } = await uploadAsset(extensionsFolderUid, options.indexHtmlPath);
-  //3. Create the extension
+  if (!options.prepare) {
+    //2. Upload index.html with new paths
+    const { url: indexUrl } = await uploadAsset(extensionsFolderUid, options.indexHtmlPath);
+    //3. Create the extension
 
-  try {
-    const { notice } = await createExtension(options, indexUrl);
-    LOG(options, `${notice}`);
-  } catch (error) {
-    console.log(`${error}`);
-  }
-  //4. Purge old files
-  if (options.purge) {
-    await purge(extensionsFolderUid, options);
-    LOG(options, `Purge completed!`);
+    try {
+      const { notice } = await createExtension(options, indexUrl);
+      LOG(options, `${notice}`);
+    } catch (error) {
+      console.log(`${error}`);
+    }
+    //4. Purge old files
+    if (options.purge) {
+      await purge(extensionsFolderUid, options);
+      LOG(options, `Purge completed!`);
+    }
   }
   console.log("Script completed!");
 }
@@ -256,16 +258,23 @@ function getMap(pattern, text) {
 async function replaceReferences(options) {
   //1. Load index.html
   let result = fs.readFileSync(options.indexHtmlPath, { encoding: "utf8" });
-
+  let extensionsFolderUid = "";
   //2. Create extensions asset sub-folder, then upload css and js files to Contentstack and get their urls
-  const extensionsFolderUid = await getExtensionFolder(options);
-  LOG(options, `Extensions Folder: ${extensionsFolderUid}`);
+  if (!options.prepare) {
+    extensionsFolderUid = await getExtensionFolder(options);
+    LOG(options, `Extensions Folder: ${extensionsFolderUid}`);
+  }
 
   //3. Replace references in index.html
   for (const k in options.references) {
     const reference = options.references[k];
     LOG(options, `Replacing Reference: ${reference}`);
-    const { url } = await uploadAsset(extensionsFolderUid, `${options.buildFolder}${reference}`);
+    let url = "";
+    if (options.prepare) {
+      url = "[replace::" + reference + "]";
+    } else {
+      url = await uploadAsset(extensionsFolderUid, `${options.buildFolder}${reference}`);
+    }
     result = result.replace(reference, url);
   }
   fs.writeFileSync(options.indexHtmlPath, result);
@@ -297,6 +306,8 @@ yargs(hideBin(process.argv))
       }
       options = inferFilesFromBuildLog(options);
       options.indexHtmlPath = options.buildFolder + "/index.html";
+      options.prepare = argv.prepare;
+      options.verbose = argv.verbose;
       // LOG(options, `Running <${argv.$0}> with options: `);
       LOG(options, `${JSON.stringify(options, null, 2)}`);
       run(options);
@@ -314,6 +325,12 @@ yargs(hideBin(process.argv))
     type: "boolean",
     demandOption: false,
     default: false,
+  })
+  .option("prepare", {
+    alias: "p",
+    describe: "simply prepare the assets for manual upload.",
+    type: "boolean",
+    demandOption: false,
   })
 
   .example(

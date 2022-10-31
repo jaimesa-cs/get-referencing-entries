@@ -5,7 +5,8 @@ node_modules
 uploader/node_modules
 /.pnp
 .pnp.js
-
+# build
+extension/build
 # testing
 /coverage
 
